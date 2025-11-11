@@ -1,0 +1,10 @@
+torch
+torchvision
+transformers
+sentence-transformers
+faiss-cpu
+umap-learn
+plotly
+streamlit
+gradio
+diffusers

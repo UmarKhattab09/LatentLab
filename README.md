@@ -1,6 +1,6 @@
 # Latent Lab
 
-Latent Lab is an interactive Streamlit app for exploring, visualizing, and searching AI-generated image and text embeddings. It uses a CLIP-based encoder to embed images and text, stores them in a vector database (FAISS), and provides 2D/3D visualizations (UMAP, t-SNE, PCA) and similarity search.
+Latent Lab is an interactive Streamlit app for exploring, visualizing, and searching AI-generated image and text embeddings. It uses a CLIP-based encoder to embed images and text, stores them in a vector database (FAISS), and provides 2D/3D visualizations (UMAP, t-SNE, PCA) and similarity search. Moreover, you can understand (Encoder/Decoders) and how they work to encode and decode the image to learn patterns.
 
 ## Features
 - Upload images or enter text to encode into a shared latent space
@@ -8,7 +8,7 @@ Latent Lab is an interactive Streamlit app for exploring, visualizing, and searc
 - Interactive 2D and 3D visualizations of embeddings (UMAP, t-SNE, PCA)
 - See where your uploads/queries lie in the embedding space
 - Supports both image and text queries
-- Robust error handling and dummy encoder fallback if model is missing
+
 
 ## Setup
 

@@ -232,28 +232,59 @@ with tab3:
         st.plotly_chart(fig)
 
 
+
 with tab4:
-    if 'z' in st.session_state and st.session_state['z'] is not None:
-        st.write("Using current encoded latent (from Tab 1) for decoding/generation.")
+    if 'uploaded' not in st.session_state:
+        st.session_state.uploaded = None
+
+    # Re-upload image here if not available from Tab1
+    uploaded_decode = st.file_uploader("Upload Image to Decode", type=["png", "jpg"], key="decode_upload")
+    if uploaded_decode:
+        st.session_state.uploaded = uploaded_decode
+
+    if st.session_state.uploaded or ('uploaded' in globals() and uploaded):
+        img = Image.open(st.session_state.uploaded or uploaded).convert("RGB")
+        st.image(img, caption="Original Image", width=300)
+
         if st.button("Decode/Reconstruct Image (VAE)"):
             try:
-                # Load pre-trained VAE (from Stable Diffusion)
-                from diffusers import AutoencoderKL  # For VAE decoder
-                vae = AutoencoderKL.from_pretrained("runwayml/stable-diffusion-v1-5", subfolder="vae")
-                vae.eval()
+                # Load VAE once and cache
+                if 'vae' not in st.session_state:
+                    from diffusers import AutoencoderKL
+                    import torch
+                    vae = AutoencoderKL.from_pretrained(
+                        "runwayml/stable-diffusion-v1-5", 
+                        subfolder="vae",
+                        torch_dtype=torch.float32
+                    )
+                    vae.eval()
+                    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                    vae.to(device)
+                    st.session_state.vae = vae
+                    st.session_state.device = device
+                else:
+                    vae = st.session_state.vae
+                    device = st.session_state.device
 
-                # Re-encode the original image to VAE latent (CLIP isn't decodable, so use original img if available)
-                if uploaded:  # Assumes you have the uploaded image from Tab 1
-                    img = Image.open(uploaded).convert("RGB")
-                    # Preprocess for VAE (resize to 256x256, normalize)
-                    img_tensor = torch.tensor(np.array(img.resize((256, 256))) / 127.5 - 1.0).permute(2, 0, 1).unsqueeze(0)
-                    with torch.no_grad():
-                        vae_latent = vae.encode(img_tensor).latent_dist.sample() * 0.18215  # Standard SD scaling
-                        decoded = vae.decode(vae_latent / 0.18215).sample[0]
-                    # Postprocess decoded tensor to image
-                    decoded_img = Image.fromarray(((decoded.permute(1, 2, 0).numpy() + 1.0) * 127.5).astype(np.uint8))
-                    st.image(decoded_img, caption="Decoded/Reconstructed Image", width=300)
+                # Preprocess: Resize, normalize, cast to float32
+                img_np = np.array(img.resize((256, 256))).astype(np.float32)  # <--- CRITICAL: float32
+                img_np = img_np / 127.5 - 1.0  # [-1, 1]
+                img_tensor = torch.from_numpy(img_np).permute(2, 0, 1).unsqueeze(0)  # [1, 3, 256, 256]
+                img_tensor = img_tensor.to(device)
+
+                # Encode → Decode
+                with torch.no_grad():
+                    latent = vae.encode(img_tensor).latent_dist.sample()
+                    latent = latent * vae.config.scaling_factor  # or 0.18215
+                    recon = vae.decode(latent / vae.config.scaling_factor).sample[0]
+
+                # Postprocess
+                recon = (recon.clamp(-1, 1) + 1) / 2  # [0, 1]
+                recon = (recon * 255).byte().cpu().permute(1, 2, 0).numpy()
+                recon_img = Image.fromarray(recon)
+                st.image(recon_img, caption="Reconstructed Image", width=300)
+                st.success("Decoding successful!")
             except Exception as e:
-                st.error(f"Decoding failed: {e}. Note: Text latents can't be decoded; use image input.")
+                st.error(f"Decoding failed: {e}")
     else:
-        st.info("Encode an image in Tab 1 first to decode.")
+        st.info("Upload an image in Tab 1 or here to decode.")
